@@ -205,6 +205,46 @@ const dateFeature = {
 
 // ================ ניהול תאריך תשלום ================
 const paymentDateFeature = {
+    // === מחיקת תאריך תשלום ===
+    clearPaymentDate: () => {
+        const paymentDateInput = document.querySelector('edox-datepicker[name="PaymentDueDate"] input');
+        if (paymentDateInput) {
+            // שומרים את הערך המקורי אם עוד לא שמרנו
+            if (!paymentDateInput.dataset.originalValue) {
+                paymentDateInput.dataset.originalValue = paymentDateInput.value;
+            }
+            // מוחקים את התאריך ומנקים את העיצוב
+            paymentDateInput.value = '';
+            dateFeature.markAsValid(paymentDateInput);
+        }
+    },
+
+    // === טיפול בשדה תאריך תשלום ===
+    handlePaymentDateClick: (e) => {
+        e.target.select();
+    },
+
+    handlePaymentDateInput: (e) => {
+        // מנקים את העיצוב של השדה כמו בתאריך ערך
+        dateFeature.markAsValid(e.target);
+    },
+
+    handlePaymentDateBlur: (e) => {
+        const input = e.target.value.trim();
+        if (input) {
+            const result = dateFeature.parseAndCompleteDate(input);
+            e.target.value = result.value;
+            
+            if (result.isValid) {
+                dateFeature.markAsValid(e.target);
+                e.target.dispatchEvent(new Event('input', { bubbles: true }));
+                e.target.dispatchEvent(new Event('change', { bubbles: true }));
+            } else {
+                dateFeature.markAsInvalid(e.target);
+            }
+        }
+    },
+
     // === מעקב אחרי שינויים בשדה הספק ===
     observeSupplierChanges: () => {
         const observer = new MutationObserver(mutations => {
@@ -228,18 +268,42 @@ const paymentDateFeature = {
     },
 
     // === הגדרת תאריך תשלום ===
-    setPaymentDate: () => {
-        const dueDateButton = document.querySelector('paper-button[ng-click="ctrl.dueSetting()"]');
-        if (dueDateButton && dueDateButton.offsetParent !== null) {  // בודקים שהכפתור מוצג
-            dueDateButton.click();
+    setPaymentDate: async () => {
+        const supplierInput = document.querySelector('input[name="Supplier"]');
+        // בודקים שיש ספק לפני שמנסים ללחוץ על הכפתור
+        if (supplierInput && supplierInput.value && !supplierInput.classList.contains('ng-empty')) {
+            try {
+                // נחכה שהכפתור יופיע מחדש
+                const dueDateButton = await waitForElement('paper-button[ng-click="ctrl.dueSetting()"]');
+                if (dueDateButton && dueDateButton.offsetParent !== null) {
+                    dueDateButton.click();
+                }
+            } catch (error) {
+                console.log('לא נמצא כפתור תאריך תשלום');
+            }
         }
+    },
+
+    // === מעקב אחרי שינויים בתאריך ערך ===
+    handleValueDateInput: () => {
+        // כשמתחילים להקליד, מוחקים את תאריך התשלום
+        paymentDateFeature.clearPaymentDate();
+    },
+
+    handleValueDateChange: (e) => {
+        // נחכה יותר זמן כדי לתת לממשק להתעדכן ולכפתור להופיע מחדש
+        setTimeout(() => {
+            paymentDateFeature.setPaymentDate();
+        }, 1000);
     },
 
     // === אתחול ===
     init: async () => {
         const supplierInput = await waitForElement('input[name="Supplier"]');
+        const valueDateInput = await waitForElement('.edox-datepicker-input');
+        const paymentDateInput = await waitForElement('edox-datepicker[name="PaymentDueDate"] input');
         
-        // מעקב אחרי שינויים בשדה הספק ובהורה שלו
+        // מעקב אחרי שינויים בשדה הספק
         const observer = paymentDateFeature.observeSupplierChanges();
         observer.observe(supplierInput.parentElement, {
             childList: true,
@@ -247,6 +311,52 @@ const paymentDateFeature = {
             subtree: true,
             characterData: true
         });
+
+        // מעקב אחרי שינויים בתאריך ערך
+        valueDateInput.addEventListener('input', paymentDateFeature.handleValueDateInput);
+        valueDateInput.addEventListener('change', paymentDateFeature.handleValueDateChange);
+
+        // הגדרת מאזינים לשדה תאריך תשלום
+        paymentDateInput.addEventListener('click', paymentDateFeature.handlePaymentDateClick);
+        paymentDateInput.addEventListener('input', paymentDateFeature.handlePaymentDateInput);
+        paymentDateInput.addEventListener('blur', paymentDateFeature.handlePaymentDateBlur);
+    }
+};
+
+// ================ ניהול בחירת מחלקה ================
+const departmentFeature = {
+    // === בחירת מחלקה ===
+    selectDepartment: async () => {
+        try {
+            // נחכה שהסלקט יופיע
+            const select = await waitForElement('select[name="Department"]');
+            if (select) {
+                // נבחר את הערך הרצוי
+                select.value = '44';
+                // נפעיל את אירוע השינוי
+                select.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        } catch (error) {
+            console.log('לא נמצא שדה בחירת מחלקה');
+        }
+    },
+
+    // === מעקב אחרי לחיצה על כפתור הוספת פריט ===
+    handleAddItemClick: () => {
+        // נחכה קצת שהשדה יתווסף לדף ואז נבחר מחלקה
+        setTimeout(() => {
+            departmentFeature.selectDepartment();
+        }, 100);
+    },
+
+    // === אתחול ===
+    init: async () => {
+        // נחכה לכפתור הוספת פריט
+        const addButton = await waitForElement('paper-button[ng-click="ctrl.invoice.newItem()"]');
+        if (addButton) {
+            // נוסיף מאזין ללחיצה
+            addButton.addEventListener('click', departmentFeature.handleAddItemClick);
+        }
     }
 };
 
@@ -255,4 +365,5 @@ if (window.location.href.includes('supplier-invoice/create')) {
     corporationFeature.init();
     dateFeature.init();
     paymentDateFeature.init();
+    departmentFeature.init();
 }
