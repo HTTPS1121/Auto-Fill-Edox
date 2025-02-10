@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "Auto Fill Edox",
+  "version": "1.0",
+  "description": "ממלא אוטומטית שדות באתר asi3.edox.me",
+  "permissions": [
+    "activeTab"
+  ],
+  "host_permissions": [
+    "*://asi3.edox.me/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["*://asi3.edox.me/*"],
+      "js": ["content.js"]
+    }
+  ]
+} 
